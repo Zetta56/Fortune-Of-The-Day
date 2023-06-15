@@ -1,0 +1,4 @@
+*/__pycache__/
+*/venv/
+scripts/fotd-ec2.pem
+scripts/variables.ps1
