@@ -37,4 +37,4 @@ aws autoscaling create-auto-scaling-group `
 --target-group-arns $targetArn
 
 
-Write-Output Done
+Write-Output "Done"

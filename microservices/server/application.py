@@ -1,14 +1,20 @@
 import boto3
 from boto3.dynamodb.conditions import Key
+from flask import Flask, render_template, request
+from flask_cors import CORS
 from random import getrandbits
-from flask import request, Blueprint
 
 session = boto3.Session(region_name="us-east-2")
 dynamodb = session.resource("dynamodb")
 messages = dynamodb.Table("fotd")
-api = Blueprint("api", __name__)
+application = Flask(__name__)
+CORS(app)
 
-@api.route("/pick")
+@application.route("/")
+def serve():
+    return render_template("index.html")
+
+@application.route("/api/pick")
 def pick_message():
     chosen = getrandbits(32)
     # Get the first item after the random id
@@ -25,7 +31,7 @@ def pick_message():
         )
     return res["Items"][0]["Message"]
 
-@api.route("/upload", methods=["POST"])
+@application.route("/api/upload", methods=["POST"])
 def upload_message():
     item = {
         "PK": 1,
@@ -34,3 +40,6 @@ def upload_message():
     }
     messages.put_item(Item=item)
     return "Done"
+
+if __name__ == "__main__":
+    application.run()

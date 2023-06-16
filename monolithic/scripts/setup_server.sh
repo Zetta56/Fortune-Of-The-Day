@@ -30,4 +30,7 @@ pip install mod_wsgi
 
 # Enable wsgi module on Apache
 mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
+
+# Start Apache server
+service httpd start
 EOF
