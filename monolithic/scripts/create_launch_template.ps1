@@ -5,7 +5,7 @@ $userData = [convert]::ToBase64String( `
 $config = @"
 {
   "IamInstanceProfile": {
-    "Name": "$roleName"
+    "Name": "$ec2RoleName"
   },
   "ImageId": "$customAmi",
   "InstanceType": "t2.micro",

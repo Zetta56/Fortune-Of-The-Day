@@ -2,3 +2,4 @@ __pycache__
 venv
 variables.ps1
 *.pem
+.env

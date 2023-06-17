@@ -33,7 +33,7 @@ ssh -i fotd-ec2.pem "ec2-user@${dns}" $bashScript
 
 $null = aws ec2 associate-iam-instance-profile `
 --instance-id $instanceId `
---iam-instance-profile "Name=${roleName}"
+--iam-instance-profile "Name=${ec2RoleName}"
 
 
 Write-Output "Done"

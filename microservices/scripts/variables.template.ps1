@@ -1,1 +1,0 @@
-$ddbTableName = "fotd"
