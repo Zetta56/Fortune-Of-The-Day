@@ -41,6 +41,7 @@ cd monolithic/scripts
 ./seed_ddb.ps1
 ./launch_basic_ec2.ps1
 ```
+To terminate your application, run `./terminate.ps1`
 
 ### Preset
 If you want to deploy this website on single EC2 instance with a pre-configured machine image, create a [custom AMI](<#creating-a-custom-amazon-machine-image>) (if you haven't done so already) and run:
@@ -49,6 +50,7 @@ cd monolithic/scripts
 ./seed_ddb.ps1
 ./launch_preset_ec2.ps1
 ```
+To terminate your application, run `./terminate.ps1`
 
 ### Scaled
 If you want to deploy this website with an EC2 auto scaling group and a load balancer, create a [custom AMI](<#creating-a-custom-amazon-machine-image>) and [launch template](<#creating-a-launch-template>) (if you haven't done so already) and run:
@@ -57,9 +59,7 @@ cd monolithic/scripts
 ./seed_ddb.ps1
 ./launch_scaled_ec2.ps1
 ```
-
-### Termination
-To terminate your application, run `./terminate.ps1`
+To terminate your application, run `./terminate.ps1 scaled`
 
 ## Local Usage
 1. Install [Python3](https://www.python.org/downloads/) (including pip)

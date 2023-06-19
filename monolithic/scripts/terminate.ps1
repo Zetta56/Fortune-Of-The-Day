@@ -32,7 +32,7 @@ if ($scaled -eq "scaled") {
         | ConvertFrom-Json `
     )
 
-    aws elbv2 delete-load-balancer --load-balancer-arn $balancerArn
+    $null = aws elbv2 delete-load-balancer --load-balancer-arn $balancerArn
 
 
     Write-Output "Deleting auto-scaling group..."
