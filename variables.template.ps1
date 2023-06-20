@@ -18,5 +18,5 @@ $customAmi = ""
 $launchTemplate = ""
 
 # Microservices
-$assetBucket = ""
+$clientBucket = ""
 $profile = ""

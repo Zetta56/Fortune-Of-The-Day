@@ -7,8 +7,8 @@ $null = aws dynamodb delete-table --table-name $ddbTableName
 
 Write-Output "Deleting S3 bucket..."
 
-aws s3 rm "s3://${assetBucket}" --recursive
-aws s3 rb "s3://${assetBucket}"
+aws s3 rm "s3://${clientBucket}" --recursive
+aws s3 rb "s3://${clientBucket}"
 
 
 Write-Output "Deleting Elastic Beanstalk application..."

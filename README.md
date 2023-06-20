@@ -17,6 +17,7 @@ This is a Fortune of the Day website created with Flask and designed for deploym
 4. Under **Inbound Rules**, add the following rules:
    - Type: HTTP, Source: Anywhere-IPv4
    - Type: SSH, Source: Anywhere-IPv4
+   - Type: HTTPS, Source: Anywhere-IPv4
 5. Keep everything else as their default values, and click **Create Security Group**
 
 ## Installation
