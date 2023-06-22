@@ -1,5 +1,6 @@
 # Common
 $ddbTableName = "fotd"
+$clientBucket = ""
 $keyName = ""
 $securityGroup = ""
 $vpc = ""
@@ -18,5 +19,11 @@ $customAmi = ""
 $launchTemplate = ""
 
 # Microservices
-$clientBucket = ""
 $profile = ""
+
+# Serverless
+$gatewayName = "fotd-api"
+$gatewayDomain = ""
+$lambdaNames = @("pick_message", "upload_message", "handle_cors")
+$lambdaRoleArn = ""
+$certificateArn = ""

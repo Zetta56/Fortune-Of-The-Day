@@ -1,5 +1,5 @@
 # Fortune of the Day
-This is a Fortune of the Day website created with Flask and designed for deployment on AWS.
+This is a Fortune of the Day website created with Flask and designed for deployment on AWS. This repository contains three different deployment architectures: monolithic, microservices, and serverless.
 
 ## Prerequisites
 - [Powershell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.3)
@@ -28,5 +28,6 @@ This is a Fortune of the Day website created with Flask and designed for deploym
    - Set $securityGroup to the ID of your EC2 security group
    - Set $vpc to the ID of your VPC
    - Set $subnetA, $subnetB, and $subnetC to the IDs of your public VPC subnets
+   - Set $clientBucket to the desired name of your client bucket (optional for monolithic architecture)
 4. Load powershell variables with `. ./variables.ps1`
    - Make sure to run this everytime you work with this repository's powershell scripts
