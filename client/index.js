@@ -10,9 +10,11 @@ const pickMessage = async () => {
 };
 
 const postMessage = (message) => {
-  let data = new FormData();
-  data.append("message", message);
-  fetch(`${backendURL}/upload`, { method: "POST", body: data });
+  fetch(`${backendURL}/upload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: message })
+  });
 };
 
 document.addEventListener("DOMContentLoaded", () => {

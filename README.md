@@ -4,30 +4,170 @@ This is a Fortune of the Day website created with Flask and designed for deploym
 ## Prerequisites
 - [Powershell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.3)
 - [Amazon Web Services (AWS) Account](https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-creating.html)
-- [AWS IAM Identity Center](https://docs.aws.amazon.com/singlesignon/latest/userguide/getting-started.html)
 - [AWS IAM User](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html)
+- [AWS IAM Identity Center User](https://docs.aws.amazon.com/singlesignon/latest/userguide/getting-started.html)
 - [AWS Virtual Private Cloud (VPC)](https://docs.aws.amazon.com/directoryservice/latest/admin-guide/gsg_create_vpc.html)
-- [EC2 Key Pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-key-pairs.html)
-- EC2 Security Group
-
-### Creating an EC2 Security Group
-1. Navigate to https://console.aws.amazon.com/ec2
-2. Under **Security Group Name**, enter a name
-3. Under **VPC**, select your created VPC
-4. Under **Inbound Rules**, add the following rules:
-   - Type: HTTP, Source: Anywhere-IPv4
-   - Type: SSH, Source: Anywhere-IPv4
-   - Type: HTTPS, Source: Anywhere-IPv4
-5. Keep everything else as their default values, and click **Create Security Group**
 
 ## Installation
 1. Run `git clone https://github.com/Zetta56/Fortune-of-the-Day.git`
 2. Rename `variables.template.ps1` to `variables.ps1`
 3. Open the variables.ps1 file
    - Set $keyName to the name of your EC2 key pair
-   - Set $securityGroup to the ID of your EC2 security group
    - Set $vpc to the ID of your VPC
    - Set $subnetA, $subnetB, and $subnetC to the IDs of your public VPC subnets
-   - Set $clientBucket to the desired name of your client bucket (optional for monolithic architecture)
-4. Load powershell variables with `. ./variables.ps1`
-   - Make sure to run this everytime you work with this repository's powershell scripts
+   - Set $clientBucket to the desired name of your S3 client bucket
+   - Set $profile to the name of your IAM profile on your local computer
+4. Modify the first line in client/index.js to `const backendURL = <your_backend_url>`
+   - Replace <your_backend_url> with the URL you plan to route to your server (ex. https://www.example.com)
+5. Load powershell variables with:
+   ```
+   cd scripts
+   . ./variables.ps1
+   ```
+   - **Make sure to run this everytime you open a new CLI session and work with this repository's powershell scripts**
+6. Create a key pair and security group with `./configure_ec2.ps1`
+   - Set $securityGroup in scripts/variables.ps1 to the security group ID outputted by this script
+   - Note: This should add a .pem key file to your config folder
+7. Create IAM roles with `./create_roles.ps1`
+   - Set $ec2RoleArn and $lambdaRoleArn in scripts/variables.ps1 to the outputted ARNs
+
+### Configuring a Domain
+1. Register a domain name (ex. [AWS Route 53](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-register.html), [Google Domain](https://domains.google/))
+2. Navigate to https://console.aws.amazon.com/route53
+3. Click Hosted Zones > Create Hosted Zone, and then create a public hosted zone with the same domain name as in step 1
+4. Add your Route 53 nameservers (found in your hosted zone NS records) to your domain
+
+### Obtaining an SSL Certificate
+Complete the following steps on us-east-1 (to let Cloudfront access your certificate) and us-east-2 (to let your other AWS services access your certificate).
+1. Navigate to https://console.aws.amazon.com/acm/home
+2. Click **Request Certificate**, and then request a public certificate with the following attributes:
+   - Fully Qualified Domain Name: \<Your Domain Name\>, *.\<Your Domain Name\>
+   - Validation Method: DNS
+   - Key Algorithm: RSA 2048
+3. Click on your certificate, and then click **Create Record in Route 53**
+4. Set $certificateArn in scripts/variables.ps1 to the ARN of your SSL certificate
+
+## Deployment
+### Single EC2
+If you want to deploy this website on single EC2 instance with an AWS-provided machine image, run:
+```
+cd monolithic/scripts
+./seed_ddb.ps1
+./launch_single_ec2.ps1
+```
+To terminate your application, run `./terminate.ps1 ec2-single`
+
+### Scaled EC2
+If you want to deploy this website with an EC2 auto scaling group and a load balancer:
+
+1. Deploy a [single EC2 instance](#single-ec2)
+   - Note the instance-id of the deployed instance
+2. Create a launch template by running: 
+   ```
+   cd scripts
+   ./create_launch_template.ps1 <Your Instance Id From Step 1>
+   ```
+   - Replace \<Your Instance Id From Step 1\> with the instance id of your EC2 instance from step 1
+3. Set $launchTemplate in scripts/variables.ps1 to the ID of your newly created launch template
+4. Run the following:
+   ```
+   cd scripts
+   ./seed_ddb.ps1
+   ./launch_scaled_ec2.ps1
+   ```
+To terminate your application, run `./terminate.ps1 ec2-scaled`
+
+### Elastic Beanstalk
+1. Install [EB CLI](https://github.com/aws/aws-elastic-beanstalk-cli-setup)
+2. Run the following:
+   ```
+   cd scripts
+   ./seed_ddb.ps1
+   ./upload_assets.ps1
+   ./launch_beanstalk.ps1
+   ```
+3. Enable HTTPS on S3 Bucket
+   1. Navigate to https://console.aws.amazon.com/cloudfront
+   2. Click **Create Distribution**, and create a distribution with the following settings:
+      - Origin Domain: \<Your S3 Bucket\>
+      - Origin Access: \<Origin Access Control Settings\>
+      - Viewer Protocol Policy: Redirect HTTP to HTTPS
+      - Web Application Firewall (WAF): \<Your Preference\>
+      - Price Class: \<Your Preference\>
+      - Alternate Domain Name: www.\<Your Domain Name\>
+      - Custom SSL Certificate: \<Your SSL Certificate\>
+      - Default Root Object: index.html
+   3. Set your S3 bucket policy to the Origin Access Control policy generated by Cloudfront
+4. Enable HTTPS on Elastic Beanstalk
+   1. Navigate to https://console.aws.amazon.com/elasticbeanstalk/
+   2. Click your environment, and then **Configuration** on the left sidebar
+   3. Edit **Instance Traffic and Scaling**, and add a new listener with the following attributes:
+      - Listener Port: 443
+      - Listener Protocol: HTTPS
+      - SSL Certificate: \<Your SSL Certificate\>
+5. Configure your DNS Records
+   1. Navigate to https://console.aws.amazon.com/route53
+   2. Click on your hosted zone > Create Record
+   3. Create a record with the following attributes
+      - Record Name: www
+      - Record Type: A
+      - Alias: True
+      - Route Traffic To: Cloudfront Distribution, \<Your Cloudfront Distribution\>
+      - Routing Policy: Simple Routing
+   4. Create a record with the following attributes
+      - Record Name: api
+      - Record Type: A
+      - Alias: True
+      - Route Traffic To: Elastic Beanstalk Environment, us-east-2, \<Your Beanstalk Environment\>
+      - Routing Policy: Simple Routing
+
+To terminate your application, run `./terminate.ps1 beanstalk`
+
+### API Gateway
+1. Create a Lambda role with full access to DynamoDB
+2. Set $lambdaRoleArn in scripts/variables.ps1 to the ARN of your Lambda role
+3. Run the following:
+   ```
+   cd scripts
+   ./seed_ddb.ps1
+   ./upload_assets.ps1
+   ./launch_gateway.ps1
+   ```
+4. Enable HTTPS on S3 Bucket
+   1. Navigate to https://console.aws.amazon.com/cloudfront
+   2. Click **Create Distribution**, and create a distribution with the following settings:
+      - Origin Domain: \<Your S3 Bucket\>
+      - Origin Access: \<Origin Access Control Settings\>
+      - Viewer Protocol Policy: Redirect HTTP to HTTPS
+      - Web Application Firewall (WAF): \<Your Preference\>
+      - Price Class: \<Your Preference\>
+      - Alternate Domain Name: www.\<Your Domain Name\>
+      - Custom SSL Certificate: \<Your SSL Certificate\>
+      - Default Root Object: index.html
+   3. Set your S3 bucket policy to the Origin Access Control policy generated by Cloudfront
+5. Enable HTTPS on API Gateway
+   1. Navigate to https://console.aws.amazon.com/apigateway
+   2. Click **Custom Domain Names** on the left sidebar
+   3. Click **Create**, and create a domain name with the following attributes:
+      - Domain Name: \<Your Domain Name\>
+      - ACM Certificate: \<Your SSL Certificate From Step 7\>
+   4. Click **API Mappings**, and configure the following mapping:
+      - API: \<Your API\>
+      - Stage: prod
+6. Configure DNS Records
+   1. Navigate to https://console.aws.amazon.com/route53
+   2. Click on your hosted zone > Create Record
+   3. Create a record with the following attributes
+      - Record Name: www
+      - Record Type: A
+      - Alias: True
+      - Route Traffic To: Cloudfront Distribution, \<Your Cloudfront Distribution\>
+      - Routing Policy: Simple Routing
+   4. Create a record with the following attributes
+      - Record Name: api
+      - Record Type: A
+      - Alias: True
+      - Route Traffic To: API Gateway API, us-east-2, \<Your API Gateway\>
+      - Routing Policy: Simple Routing
+
+To terminate your application, run `./terminate.ps1 gateway`

@@ -8,11 +8,10 @@ const pickMessage = async () => {
 };
 
 const postMessage = (message) => {
-  let data = new FormData();
-  data.append("message", message);
   fetch("/api/upload", {
     method: "POST",
-    body: data
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: message })
   });
 };
 

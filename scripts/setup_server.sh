@@ -33,4 +33,5 @@ mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi
 
 # Start Apache server
 service httpd start
+chkconfig httpd on
 EOF

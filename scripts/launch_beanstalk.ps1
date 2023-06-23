@@ -1,4 +1,4 @@
-cd "../server"
+cd "../beanstalk"
 
 eb init "fotd" `
 --region "us-east-2" `

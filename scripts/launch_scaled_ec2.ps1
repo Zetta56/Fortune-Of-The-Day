@@ -36,5 +36,9 @@ aws autoscaling create-auto-scaling-group `
 --availability-zones "us-east-2a" "us-east-2b" "us-east-2c" `
 --target-group-arns $targetArn
 
+$dns =  aws elbv2 describe-load-balancers `
+--load-balancer-arns $balancerArn `
+--query "LoadBalancers[0].DNSName"
 
-Write-Output "Done"
+
+Write-Output "Server Started`nDNS: ${dns}"
