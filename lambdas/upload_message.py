@@ -10,9 +10,8 @@ def main(event, context):
         "Id": { "N": str(getrandbits(32)) },
         "Message": { "S": body["message"] }
     }
-    dynamodb.put_item(TableName="fotd", Item=item)
+    dynamodb.put_item(TableName="fotd-ddb", Item=item)
     return {
         "statusCode": 200,
-        "headers": { "Access-Control-Allow-Origin": "*" },
-        "body": "Done"
+        "headers": { "Access-Control-Allow-Origin": "*" }
     }

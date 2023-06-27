@@ -9,7 +9,7 @@ def main(event, context):
     }
     # Get the first item after the random id
     res = dynamodb.query(
-        TableName="fotd",
+        TableName="fotd-ddb",
         KeyConditionExpression="PK = :pk AND Id > :id",
         ExpressionAttributeValues=attributes,
         Limit=1
@@ -17,7 +17,7 @@ def main(event, context):
     # If no items are after the random id, get the first item previous
     if (not res["Items"]):
         res = dynamodb.query(
-            TableName="fotd",
+            TableName="fotd-ddb",
             KeyConditionExpression="PK = :pk AND Id <= :id",
             ExpressionAttributeValues=attributes,
             Limit=1

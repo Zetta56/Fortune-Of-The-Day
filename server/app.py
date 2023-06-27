@@ -19,7 +19,7 @@ def pick_message():
     }
     # Get the first item after the random id
     res = dynamodb.query(
-        TableName="fotd",
+        TableName="fotd-ddb",
         KeyConditionExpression="PK = :pk AND Id > :id",
         ExpressionAttributeValues=attributes,
         Limit=1
@@ -27,7 +27,7 @@ def pick_message():
     # If no items are after the random id, get the first item previous
     if (not res["Items"]):
         res = dynamodb.query(
-            TableName="fotd",
+            TableName="fotd-ddb",
             KeyConditionExpression="PK = :pk AND Id <= :id",
             ExpressionAttributeValues=attributes,
             Limit=1
@@ -41,7 +41,7 @@ def upload_message():
         "Id": { "N": str(getrandbits(32)) },
         "Message": { "S": request.json["message"] }
     }
-    dynamodb.put_item(TableName="fotd", Item=item)
+    dynamodb.put_item(TableName="fotd-ddb", Item=item)
     return "Done"
 
 if __name__ == "__main__":

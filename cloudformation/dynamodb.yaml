@@ -1,0 +1,72 @@
+Resources:
+  Dynamodb:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: fotd-ddb
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: N
+        - AttributeName: Id
+          AttributeType: N
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: Id
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+  DynamodbLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: DynamodbRoleForLambda
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  SeedLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        # Writing inline lambda under ZipFile tells AWS to automatically
+        # import cfnresponse
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          from random import getrandbits
+
+          def seed_ddb(event, context):
+            dynamodb = boto3.client("dynamodb", region_name="us-east-2")
+            messages = [
+              "Don't hold onto things that require a tight grip.",
+              "I didn't come this far to only come this far.",
+              "Vulnerability sounds like faith and looks like courage."
+            ]
+            for message in messages:
+              dynamodb.put_item(
+                TableName=event["ResourceProperties"]["TableName"], 
+                Item={
+                  "PK": { "N": "1" },
+                  "Id": { "N": str(getrandbits(32)) },
+                  "Message": { "S": message }
+                }
+              )
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+      Handler: index.seed_ddb
+      Role: !GetAtt [DynamodbLambdaRole, Arn]
+      Runtime: python3.9
+  SeedLogic:
+    Type: Custom::SeedLambda
+    DependsOn: Dynamodb
+    Properties:
+      ServiceToken:
+        !GetAtt [SeedLambda, Arn]
+      TableName: !Ref Dynamodb

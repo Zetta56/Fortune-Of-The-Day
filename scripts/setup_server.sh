@@ -16,7 +16,6 @@ touch "${serverDest}/logs/fotd.log"
 chown apache:apache "${serverDest}/logs/fotd.log"
 
 # Move application files
-rm -rf ${serverSource}/__pycache__ ${serverSource}/venv
 mv "${serverSource}/fotd.conf" "/etc/httpd/conf.d/fotd.conf"
 mv "${serverSource}/*" "${serverDest}"
 rm -r "/home/ec2-user/server"

@@ -17,7 +17,7 @@ $lambdaRoleArn = ""
 $certificateArn = ""
 
 # Preset
-$ddbTableName = "fotd"
+$ddbTableName = "fotd-ddb"
 $keyName = "fotd-kp"
 $loadBalancerName = "fotd-alb"
 $autoScalingGroupName = "fotd-asg"

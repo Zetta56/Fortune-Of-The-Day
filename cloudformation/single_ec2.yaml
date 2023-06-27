@@ -1,0 +1,92 @@
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Enter the ID of the VPC to launch your EC2 security group in
+  AssetBucketName:
+    Type: String
+    Description: Enter the name of your S3 asset bucket
+
+Resources:
+  Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap [RegionMap, !Ref AWS::Region, AMI]
+      InstanceType: t2.micro
+      SecurityGroupIds: 
+        - !GetAtt NetworkStack.Outputs.SecurityGroup
+      KeyName: !GetAtt NetworkStack.Outputs.KeyPair
+      IamInstanceProfile: !Ref InstanceProfile
+      UserData:
+        Fn::Base64: !Sub | 
+          #!/bin/sh
+          serverDest="/var/www/flask/server"
+          sudo su << EOF
+
+          # Install yum packages
+          yum update -y
+          yum install httpd -y
+          yum install httpd-devel -y
+          yum install python3-pip -y
+          yum install python3-devel -y
+
+          # Add log file
+          mkdir -p "${!serverDest}/logs"
+          touch "${!serverDest}/logs/fotd.log"
+          chown apache:apache "${!serverDest}/logs/fotd.log"
+
+          # Move application files
+          aws s3 cp s3://${AssetBucketName}/server $serverDest --recursive
+          mv "${!serverDest}/fotd.conf" "/etc/httpd/conf.d/fotd.conf"
+
+          # Install Python packages
+          cd "${!serverDest}"
+          python3 -m venv venv
+          source ./venv/bin/activate
+          pip install -r requirements.txt
+          pip install mod_wsgi
+
+          # Enable wsgi module on Apache
+          mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
+
+          # Start Apache server
+          service httpd start
+          chkconfig httpd on
+          EOF
+      Tags: 
+        - {Key: Name, Value: fotd}
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: FotdRoleForEC2
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: FotdRoleForEC2
+      Roles:
+        - !Ref InstanceRole
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "./network.yaml"
+      Parameters:
+        VpcId: !Ref VpcId
+  DynamodbStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "./dynamodb.yaml"
+  
+Mappings:
+  RegionMap:
+    us-east-2:
+      AMI: ami-01107263728f3bef4

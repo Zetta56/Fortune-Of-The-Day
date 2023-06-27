@@ -27,14 +27,12 @@ $ec2RoleArn = aws iam create-role `
 aws iam attach-role-policy `
 --role-name $ec2RoleName `
 --policy-arn "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
-aws iam attach-role-policy `
---role-name $ec2RoleName `
---policy-arn "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 
 $null = aws iam create-instance-profile `
 --instance-profile-name $ec2RoleName `
 --query "InstanceProfile.Arn" `
 | ConvertFrom-Json
+
 aws iam add-role-to-instance-profile `
 --instance-profile-name $ec2RoleName `
 --role-name $ec2RoleName
