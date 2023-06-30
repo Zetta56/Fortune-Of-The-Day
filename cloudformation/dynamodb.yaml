@@ -61,12 +61,17 @@ Resources:
               )
             cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
       Handler: index.seed_ddb
-      Role: !GetAtt [DynamodbLambdaRole, Arn]
+      Role: !GetAtt DynamodbLambdaRole.Arn
       Runtime: python3.9
   SeedLogic:
     Type: Custom::SeedLambda
     DependsOn: Dynamodb
     Properties:
-      ServiceToken:
-        !GetAtt [SeedLambda, Arn]
+      ServiceToken: !GetAtt SeedLambda.Arn
       TableName: !Ref Dynamodb
+
+Outputs:
+  DynamodbLambdaRole:
+    Value: !GetAtt DynamodbLambdaRole.Arn
+    Export:
+      Name: DynamodbLambdaRole

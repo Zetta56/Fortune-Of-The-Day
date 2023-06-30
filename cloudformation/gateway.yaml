@@ -1,0 +1,150 @@
+Parameters:
+  DomainName:
+    Type: String
+    Description: Enter the domain name for your S3 static website
+  CertificateArnCF:
+    Type: String
+    Description: Enter the ARN of the ACM certificate for your domain (in us-east-1)
+  CertificateArnMain:
+    Type: String
+    Description: Enter the ARN of the ACM certificate for your domain (in your main region)
+
+Resources:
+  # HTTP API
+  Gateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: fotd-gw
+      ProtocolType: HTTP
+  GatewayStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref Gateway
+      StageName: prod
+      AutoDeploy: true
+  GatewayDomain:
+    Type: AWS::ApiGatewayV2::DomainName
+    Properties:
+      DomainName: !Sub "api.${DomainName}"
+      DomainNameConfigurations:
+        - EndpointType: REGIONAL
+          CertificateArn: !Ref CertificateArnMain
+  GatewayMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: !Sub "api.${DomainName}"
+      ApiId: !Ref Gateway
+      Stage: !Ref GatewayStage
+  # Pick Message
+  PickLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: "../lambdas/pick_message.py"
+      Handler: pick_message.main
+      Role: !GetAtt DynamodbStack.Outputs.DynamodbLambdaRole
+      Runtime: python3.9
+  PickInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PickLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+  PickIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Gateway
+      IntegrationType: AWS_PROXY
+      PayloadFormatVersion: 2.0
+      IntegrationUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PickLambda.Arn}/invocations"
+  PickRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Gateway
+      RouteKey: "GET /pick"
+      Target: !Sub "integrations/${PickIntegration}"
+  # Upload Message
+  UploadLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: "../lambdas/upload_message.py"
+      Handler: upload_message.main
+      Role: !GetAtt DynamodbStack.Outputs.DynamodbLambdaRole
+      Runtime: python3.9
+  UploadInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref UploadLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+  UploadIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Gateway
+      IntegrationType: AWS_PROXY
+      PayloadFormatVersion: 2.0
+      IntegrationUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UploadLambda.Arn}/invocations"
+  UploadRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Gateway
+      RouteKey: "POST /upload"
+      Target: !Sub "integrations/${UploadIntegration}"
+  # Handle CORS
+  CorsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: "../lambdas/handle_cors.py"
+      Handler: handle_cors.main
+      Role: !GetAtt DynamodbStack.Outputs.DynamodbLambdaRole
+      Runtime: python3.9
+  CorsInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CorsLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+  CorsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Gateway
+      IntegrationType: AWS_PROXY
+      PayloadFormatVersion: 2.0
+      IntegrationUri: !Sub "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CorsLambda.Arn}/invocations"
+  CorsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Gateway
+      RouteKey: "OPTIONS /upload"
+      Target: !Sub "integrations/${CorsIntegration}"
+  # Misc.
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub "${DomainName}."
+      Name: !Sub "api.${DomainName}"
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt GatewayDomain.RegionalHostedZoneId
+        DNSName: !GetAtt GatewayDomain.RegionalDomainName
+  ClientStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "./client.yaml"
+      Parameters:
+        DomainName: !Ref DomainName
+        CertificateArnCF: !Ref CertificateArnCF
+  # NetworkStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     TemplateURL: "./network.yaml"
+  DynamodbStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "./dynamodb.yaml"
+  
+Mappings:
+  RegionMap:
+    us-east-1:
+      HostedZone: Z35SXDOTRQ7X7K
+    us-east-2:
+      HostedZone: Z3AADJGX6KTTL2

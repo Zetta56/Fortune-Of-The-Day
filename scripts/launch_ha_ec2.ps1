@@ -33,7 +33,7 @@ aws autoscaling create-auto-scaling-group `
 --max-size 2 `
 --desired-capacity 1 `
 --launch-template "LaunchTemplateId=${launchTemplate}" `
---availability-zones "us-east-2a" "us-east-2b" "us-east-2c" `
+--availability-zones "${region}a" "${region}b" "${region}c" `
 --target-group-arns $targetArn
 
 $dns =  aws elbv2 describe-load-balancers `

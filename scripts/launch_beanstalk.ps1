@@ -1,7 +1,7 @@
 cd "../beanstalk"
 
 eb init "fotd" `
---region "us-east-2" `
+--region $region `
 --platform "python-3.9" `
 --keyname $keyName `
 --profile $profile

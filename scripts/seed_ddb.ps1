@@ -5,7 +5,7 @@ $null = aws dynamodb create-table `
 --attribute-definitions "AttributeName=PK,AttributeType=N" "AttributeName=Id,AttributeType=N"`
 --key-schema "AttributeName=PK,KeyType=HASH" "AttributeName=Id,KeyType=RANGE" `
 --provisioned-throughput "ReadCapacityUnits=2,WriteCapacityUnits=2" `
---region "us-east-2"
+--region $region
 
 aws dynamodb wait table-exists --table-name $ddbTableName
 

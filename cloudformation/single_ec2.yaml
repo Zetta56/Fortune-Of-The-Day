@@ -1,21 +1,23 @@
 Parameters:
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: Enter the ID of the VPC to launch your EC2 security group in
   AssetBucketName:
     Type: String
     Description: Enter the name of your S3 asset bucket
 
 Resources:
+  # EC2
   Server:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !FindInMap [RegionMap, !Ref AWS::Region, AMI]
+      ImageId: !FindInMap [ RegionMap, !Ref AWS::Region, AMI ]
       InstanceType: t2.micro
-      SecurityGroupIds: 
-        - !GetAtt NetworkStack.Outputs.SecurityGroup
       KeyName: !GetAtt NetworkStack.Outputs.KeyPair
       IamInstanceProfile: !Ref InstanceProfile
+      NetworkInterfaces:
+        - SubnetId: !GetAtt NetworkStack.Outputs.SubnetA
+          AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet: 
+            - !GetAtt NetworkStack.Outputs.SecurityGroup
       UserData:
         Fn::Base64: !Sub | 
           #!/bin/sh
@@ -53,7 +55,8 @@ Resources:
           chkconfig httpd on
           EOF
       Tags: 
-        - {Key: Name, Value: fotd}
+        - { Key: Name, Value: fotd }
+  # Roles
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -75,12 +78,11 @@ Resources:
       InstanceProfileName: FotdRoleForEC2
       Roles:
         - !Ref InstanceRole
+  # Misc.
   NetworkStack:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: "./network.yaml"
-      Parameters:
-        VpcId: !Ref VpcId
   DynamodbStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -88,5 +90,7 @@ Resources:
   
 Mappings:
   RegionMap:
+    us-east-1:
+      AMI: ami-06b09bfacae1453cb
     us-east-2:
       AMI: ami-01107263728f3bef4

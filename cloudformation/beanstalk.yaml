@@ -1,0 +1,161 @@
+Parameters:
+  DomainName:
+    Type: String
+    Description: Enter the domain name for your S3 static website
+  CertificateArnCF:
+    Type: String
+    Description: Enter the ARN of the ACM certificate for your domain (in us-east-1)
+  CertificateArnMain:
+    Type: String
+    Description: Enter the ARN of the ACM certificate for your domain (in your main region)
+
+Resources:
+  # EB Application
+  Application:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      ApplicationName: fotd-app
+  ApplicationVersion:
+    Type: AWS::ElasticBeanstalk::ApplicationVersion
+    Properties:
+      ApplicationName: !Ref Application
+      SourceBundle: "../beanstalk"
+  # EB Environment
+  Environment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Properties:
+      EnvironmentName: fotd-env
+      ApplicationName: !Ref Application
+      VersionLabel: !Ref ApplicationVersion
+      TemplateName: !Ref ConfigTemplate
+  ConfigTemplate:
+    Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+    Properties:
+      ApplicationName: !Ref Application
+      OptionSettings:
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: EnvironmentType
+          Value: LoadBalanced
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: LoadBalancerType
+          Value: application
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: ServiceRole
+          Value: !Ref BeanstalkRole
+        - Namespace: aws:autoscaling:asg
+          OptionName: MinSize
+          Value: 1
+        - Namespace: aws:autoscaling:asg
+          OptionName: MaxSize
+          Value: 4
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: IamInstanceProfile
+          Value: !Ref InstanceProfile
+        - Namespace: aws:ec2:vpc
+          OptionName: VPCId
+          Value: !GetAtt NetworkStack.Outputs.VPC
+        - Namespace: aws:ec2:vpc
+          OptionName: Subnets
+          Value: !Join [ ",", [
+            !GetAtt NetworkStack.Outputs.SubnetA,
+            !GetAtt NetworkStack.Outputs.SubnetB,
+            !GetAtt NetworkStack.Outputs.SubnetC,
+          ]]
+        - Namespace: aws:ec2:vpc
+          OptionName: ELBSubnets
+          Value: !Join [ ",", [
+            !GetAtt NetworkStack.Outputs.SubnetA,
+            !GetAtt NetworkStack.Outputs.SubnetB,
+            !GetAtt NetworkStack.Outputs.SubnetC,
+          ]]
+        - Namespace: aws:ec2:vpc
+          OptionName: ELBScheme
+          Value: public
+        - Namespace: aws:ec2:vpc
+          OptionName: AssociatePublicIpAddress
+          Value: true
+        - Namespace: aws:ec2:instances
+          OptionName: InstanceTypes
+          Value: t2.micro,t3.micro
+        - Namespace: aws:ec2:instances
+          OptionName: SupportedArchitectures
+          Value: x86_64
+        - Namespace: aws:elbv2:listener:443
+          OptionName: Protocol
+          Value: HTTPS
+        - Namespace: aws:elbv2:listener:443
+          OptionName: SSLCertificateArns
+          Value: !Ref CertificateArnMain
+      SolutionStackName: "64bit Amazon Linux 2023 v4.0.1 running Python 3.9"
+  # Roles
+  BeanstalkRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: FotdRoleForBeanstalk
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - elasticbeanstalk.amazonaws.com
+            Action:
+              - sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: elasticbeanstalk
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkEnhancedHealth
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkManagedUpdatesCustomerRolePolicy
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: FotdRoleForEC2
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: FotdRoleForEC2
+      Roles:
+        - !Ref InstanceRole
+  # Misc.
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub "${DomainName}."
+      Name: !Sub "api.${DomainName}"
+      Type: A
+      AliasTarget:
+        HostedZoneId: !FindInMap [ RegionMap, !Ref AWS::Region, HostedZone ]
+        DNSName: !GetAtt Environment.EndpointURL
+  ClientStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "./client.yaml"
+      Parameters:
+        DomainName: !Ref DomainName
+        CertificateArnCF: !Ref CertificateArnCF
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "./network.yaml"
+  DynamodbStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "./dynamodb.yaml"
+  
+Mappings:
+  RegionMap:
+    us-east-1:
+      HostedZone: Z35SXDOTRQ7X7K
+    us-east-2:
+      HostedZone: Z3AADJGX6KTTL2

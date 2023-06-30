@@ -5,6 +5,7 @@ $subnetB = ""
 $subnetC = ""
 
 # Application
+$region = ""
 $securityGroup = ""
 $launchTemplate = ""
 $clientBucket = ""

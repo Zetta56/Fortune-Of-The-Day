@@ -15,7 +15,7 @@ if ($mode -eq "ec2-single" -or $mode -eq "ec2-scaled") {
     aws ec2 wait instance-terminated --instance-ids $instanceIds
 }
 
-if ($mode -eq "ec2-scaled") {
+if ($mode -eq "ec2-ha") {
     Write-Output "Deleting load balancer..."
     $balancerArn = aws elbv2 describe-load-balancers `
     --names $loadBalancerName `

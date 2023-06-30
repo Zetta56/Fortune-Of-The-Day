@@ -1,0 +1,135 @@
+Parameters:
+  AssetBucketName:
+    Type: String
+    Description: Enter the name of your S3 asset bucket
+
+Resources:
+  # Application Load Balancer
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: fotd-alb
+      SecurityGroups:
+        - !GetAtt NetworkStack.Outputs.SecurityGroup
+      Subnets:
+        - !GetAtt NetworkStack.Outputs.SubnetA
+        - !GetAtt NetworkStack.Outputs.SubnetB
+        - !GetAtt NetworkStack.Outputs.SubnetC
+      Type: application
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: fotd-tg
+      Port: 80
+      Protocol: HTTP
+      VpcId: !GetAtt NetworkStack.Outputs.VPC
+  # Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: 1
+      MaxSize: 4
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      VPCZoneIdentifier:
+        - !GetAtt NetworkStack.Outputs.SubnetA
+        - !GetAtt NetworkStack.Outputs.SubnetB
+        - !GetAtt NetworkStack.Outputs.SubnetC
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateName: fotd-lt
+      LaunchTemplateData:
+        ImageId: !FindInMap [ RegionMap, !Ref AWS::Region, AMI ]
+        InstanceType: t2.micro
+        KeyName: !GetAtt NetworkStack.Outputs.KeyPair
+        IamInstanceProfile:
+          Name: !Ref InstanceProfile
+        SecurityGroupIds: 
+          - !GetAtt NetworkStack.Outputs.SecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/sh
+            serverDest="/var/www/flask/server"
+            sudo su << EOF
+
+            # Install yum packages
+            yum update -y
+            yum install httpd -y
+            yum install httpd-devel -y
+            yum install python3-pip -y
+            yum install python3-devel -y
+
+            # Add log file
+            mkdir -p "${!serverDest}/logs"
+            touch "${!serverDest}/logs/fotd.log"
+            chown apache:apache "${!serverDest}/logs/fotd.log"
+
+            # Move application files
+            aws s3 cp s3://${AssetBucketName}/server $serverDest --recursive
+            mv "${!serverDest}/fotd.conf" "/etc/httpd/conf.d/fotd.conf"
+
+            # Install Python packages
+            cd "${!serverDest}"
+            python3 -m venv venv
+            source ./venv/bin/activate
+            pip install -r requirements.txt
+            pip install mod_wsgi
+
+            # Enable wsgi module on Apache
+            mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
+
+            # Start Apache server
+            service httpd start
+            chkconfig httpd on
+            EOF
+  # Roles
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: FotdRoleForEC2
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: FotdRoleForEC2
+      Roles:
+        - !Ref InstanceRole
+  # Misc.
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "./network.yaml"
+  DynamodbStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "./dynamodb.yaml"
+  
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-06b09bfacae1453cb
+    us-east-2:
+      AMI: ami-01107263728f3bef4
