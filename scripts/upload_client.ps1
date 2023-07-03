@@ -1,4 +1,4 @@
-$corsPath = Resolve-Path -Path "../config/s3_cors.json"
+$corsPath = Resolve-Path -Path "./config/s3_cors.json"
 
 aws s3 mb "s3://${clientBucket}" --region $region
 aws s3 cp "../client" "s3://${clientBucket}" --recursive --region $region

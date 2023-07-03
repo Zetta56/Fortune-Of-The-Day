@@ -1,0 +1,27 @@
+name: CI/CD Pipeline
+on:
+  push:
+    branches: [ "main" ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/CDRoleForGitHub
+          role-session-name: deploy-session
+          aws-region: us-east-2
+      - name: Deploy to CodeDeploy
+        id: deploy
+        run: |
+          aws deploy create-deployment \
+          --application-name fotd-app \
+          --deployment-group-name fotd-dg \
+          --deployment-config-name CodeDeployDefault.OneAtATime \
+          --github-location repository=${{ github.repository }},commitId=${{ github.sha }}

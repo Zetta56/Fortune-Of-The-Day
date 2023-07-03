@@ -3,7 +3,7 @@ aws ec2 create-key-pair `
 --key-type "rsa" `
 --key-format "pem" `
 --query "KeyMaterial" `
---output "text" > "../config/${keyName}.pem"
+--output "text" > "./config/${keyName}.pem"
 
 $securityGroup = aws ec2 create-security-group `
 --group-name "fotd-sg" `

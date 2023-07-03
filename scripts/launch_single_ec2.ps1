@@ -27,9 +27,9 @@ Write-Output "Setting up instance..."
 $serverFiles = Get-ChildItem -Path "..\server\" -Exclude venv,__pycache__
 $bashScript = Get-Content -Raw "setup_server.sh"
 
-ssh -i "../config/fotd-ec2.pem" -o StrictHostKeyChecking=accept-new "ec2-user@${dns}" "mkdir server"
-scp -r -i "../config/fotd-ec2.pem" $serverFiles "ec2-user@${dns}:~/server"
-ssh -i "../config/fotd-ec2.pem" "ec2-user@${dns}" $bashScript
+ssh -i "./config/fotd-ec2.pem" -o StrictHostKeyChecking=accept-new "ec2-user@${dns}" "mkdir server"
+scp -r -i "./config/fotd-ec2.pem" $serverFiles "ec2-user@${dns}:~/server"
+ssh -i "./config/fotd-ec2.pem" "ec2-user@${dns}" $bashScript
 
 $null = aws ec2 associate-iam-instance-profile `
 --instance-id $instanceId `
