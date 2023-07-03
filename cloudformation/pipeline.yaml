@@ -1,8 +1,3 @@
-Parameters:
-  AssetBucketName:
-    Type: String
-    Description: Enter the name of your S3 asset bucket
-
 Resources:
   # EC2
   Server:
@@ -18,41 +13,35 @@ Resources:
           DeviceIndex: 0
           GroupSet: 
             - !GetAtt NetworkStack.Outputs.SecurityGroup
-      UserData:
-        Fn::Base64: !Sub | 
-          #!/bin/sh
-          serverDest="/var/www/flask/server"
-          sudo su << EOF
-
-          # Install yum packages
-          yum update -y
-          yum install httpd -y
-          yum install httpd-devel -y
-          yum install python3-pip -y
-          yum install python3-devel -y
-
-          # Enable wsgi module on Apache
-          pip install mod_wsgi
-          mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
-
-          # Move application files
-          aws s3 cp s3://${AssetBucketName}/server $serverDest --recursive
-          mv "${!serverDest}/fotd.conf" "/etc/httpd/conf.d/fotd.conf"
-          chown apache:apache "${!serverDest}/logs/fotd.log"
-
-          # Install Python packages
-          cd "${!serverDest}"
-          python3 -m venv venv
-          source ./venv/bin/activate
-          pip install -r requirements.txt
-          
-          # Start Apache server
-          service httpd start
-          chkconfig httpd on
-          EOF
+      # UserData:
+      #   Fn::Base64: !Sub | 
+      #     #!/bin/sh
+      #     sudo su << EOF
+      #     yum update -y
+      #     yum install httpd -y
+      #     yum install httpd-devel -y
+      #     yum install python3-pip -y
+      #     yum install python3-devel -y
+      #     pip install mod_wsgi
+      #     mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
+      #     EOF
       Tags: 
-        - { Key: Name, Value: fotd }
+        - { Key: Name, Value: fotd-deploy }
   # Roles
+  CodeDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: FotdRoleForCodeDeploy
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codedeploy.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -67,7 +56,7 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
-        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:

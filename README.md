@@ -4,7 +4,7 @@ This is a Fortune of the Day website created with Flask and designed for deploym
 ## Prerequisites
 - [Powershell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-7.3)
 - [Amazon Web Services (AWS) Account](https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-creating.html)
-- [AWS IAM User](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html)
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 - [AWS IAM Identity Center User](https://docs.aws.amazon.com/singlesignon/latest/userguide/getting-started.html)
 
 ## Installation
@@ -13,6 +13,8 @@ This is a Fortune of the Day website created with Flask and designed for deploym
 3. Navigate to https://console.aws.amazon.com/route53
 4. Click Hosted Zones > Create Hosted Zone, and then create a public hosted zone with the same domain name as in step 1
 5. Add your Route 53 nameservers (found in your hosted zone NS records) to your domain
+6. Modify the first line in client/index.js to `const backendURL = "https://api.<your_domain>"`
+   - Replace <your_domain> with the domain name you registered in step 2
 
 ### Obtaining SSL Certificates
 Complete the following steps on us-east-1 and your main region.

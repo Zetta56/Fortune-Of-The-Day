@@ -133,10 +133,6 @@ Resources:
       Parameters:
         DomainName: !Ref DomainName
         CertificateArnCF: !Ref CertificateArnCF
-  # NetworkStack:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #     TemplateURL: "./network.yaml"
   DynamodbStack:
     Type: AWS::CloudFormation::Stack
     Properties:

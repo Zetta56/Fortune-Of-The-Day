@@ -10,14 +10,15 @@ yum install httpd-devel -y
 yum install python3-pip -y
 yum install python3-devel -y
 
-# Add log file
-mkdir -p "${serverDest}/logs"
-touch "${serverDest}/logs/fotd.log"
-chown apache:apache "${serverDest}/logs/fotd.log"
+# Enable wsgi module on Apache
+pip install mod_wsgi
+mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
 
 # Move application files
+mkdir -p ${serverDest}
 mv "${serverSource}/fotd.conf" "/etc/httpd/conf.d/fotd.conf"
 mv "${serverSource}/*" "${serverDest}"
+chown apache:apache "${serverDest}/logs/fotd.log"
 rm -r "/home/ec2-user/server"
 
 # Install Python packages
@@ -25,10 +26,6 @@ cd "${serverDest}"
 python3 -m venv venv
 source ./venv/bin/activate
 pip install -r requirements.txt
-pip install mod_wsgi
-
-# Enable wsgi module on Apache
-mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
 
 # Start Apache server
 service httpd start
