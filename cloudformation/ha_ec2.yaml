@@ -2,6 +2,12 @@ Parameters:
   AssetBucketName:
     Type: String
     Description: Enter the name of your S3 asset bucket
+  DomainName:
+    Type: String
+    Description: Enter the domain name for your S3 static website
+  CertificateArnMain:
+    Type: String
+    Description: Enter the ARN of the ACM certificate for your domain (in your main region)
 
 Resources:
   # Application Load Balancer
@@ -16,7 +22,7 @@ Resources:
         - !GetAtt NetworkStack.Outputs.SubnetB
         - !GetAtt NetworkStack.Outputs.SubnetC
       Type: application
-  ALBListener:
+  HTTPListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
@@ -25,6 +31,18 @@ Resources:
       LoadBalancerArn: !Ref ALB
       Port: 80
       Protocol: HTTP
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ALB
+      Certificates:
+        - CertificateArn: !Ref CertificateArnMain
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Port: 443
+      Protocol: HTTPS
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -62,9 +80,7 @@ Resources:
         UserData:
           Fn::Base64: !Sub |
             #!/bin/sh
-            serverDest="/var/www/flask/server"
             sudo su << EOF
-
             # Install yum packages
             yum update -y
             yum install httpd -y
@@ -76,13 +92,12 @@ Resources:
             pip install mod_wsgi
             mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
 
-            # Move application files
-            aws s3 cp s3://${AssetBucketName}/server $serverDest --recursive
-            mv "${!serverDest}/fotd.conf" "/etc/httpd/conf.d/fotd.conf"
-            chown apache:apache "${!serverDest}/logs/fotd.log"
-
-            # Install Python packages
-            cd "${!serverDest}"
+            # Install application
+            mkdir -p /var/www/flask/server
+            aws s3 cp s3://${AssetBucketName}/server /var/www/flask/server --recursive
+            cd /var/www/flask/server
+            mv fotd.conf /etc/httpd/conf.d/fotd.conf
+            chown apache:apache logs/fotd.log
             python3 -m venv venv
             source ./venv/bin/activate
             pip install -r requirements.txt
@@ -114,6 +129,15 @@ Resources:
       Roles:
         - !Ref InstanceRole
   # Misc.
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub "${DomainName}."
+      Name: !Sub "www.${DomainName}"
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt ALB.CanonicalHostedZoneID
+        DNSName: !GetAtt ALB.DNSName
   NetworkStack:
     Type: AWS::CloudFormation::Stack
     Properties:

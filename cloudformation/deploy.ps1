@@ -14,13 +14,12 @@ aws cloudformation package `
 --output-template-file "output.yaml"
 
 # If deploying over HTTP with EC2 instance...
-if ($template -like "*single_ec2.yaml*" -or
-    $template -like "*ha_ec2.yaml*") {
-
+if ($template -like "*single_ec2.yaml*") {
   # Upload server
   aws s3 cp "../server" "s3://${assetBucket}/server" `
   --exclude "venv/*" `
   --exclude "__pycache__/*" `
+  --exclude "tests/*" `
   --recursive
 
   # Deploy template
@@ -31,7 +30,32 @@ if ($template -like "*single_ec2.yaml*" -or
   --capabilities "CAPABILITY_NAMED_IAM"
 }
 
-# If deploying over HTTPS with S3 client
+# If deploying highly available EC2 instances
+elseif ($template -like "*ha_ec2.yaml*" -or $template -like "*pipeline.yaml*") {
+
+  # Ask for parameters
+  $domainName = Read-Host -Prompt "Enter your domain name"
+  $certificateArnMain = Read-Host -Prompt "Enter the ARN of your ACM certificate (main region)"
+
+  # Upload server
+  aws s3 cp "../server" "s3://${assetBucket}/server" `
+  --exclude "venv/*" `
+  --exclude "__pycache__/*" `
+  --exclude "tests/*" `
+  --recursive
+
+  # Deploy template
+  aws cloudformation deploy `
+  --stack-name "fotd" `
+  --template-file "output.yaml" `
+  --parameter-overrides `
+    "AssetBucketName=$assetBucket" `
+    "DomainName=$domainName" `
+    "CertificateArnMain=$certificateArnMain" `
+  --capabilities "CAPABILITY_NAMED_IAM"
+}
+
+# If deploying with S3 client
 elseif ($template -like "*client.yaml*" -or
     $template -like "*beanstalk.yaml*" -or
     $template -like "*gateway.yaml*") {

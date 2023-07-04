@@ -3,6 +3,7 @@ os: linux
 files:
   - source: server
     destination: /var/www/flask/server
+file_exists_behavior: OVERWRITE
 hooks:
   AfterInstall:
     - location: scripts/configure_server.sh

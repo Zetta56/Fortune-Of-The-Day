@@ -1,3 +1,14 @@
+Parameters:
+  AssetBucketName:
+    Type: String
+    Description: Enter the name of your S3 asset bucket
+  DomainName:
+    Type: String
+    Description: Enter the domain name for your S3 static website
+  CertificateArnMain:
+    Type: String
+    Description: Enter the ARN of the ACM certificate for your domain (in your main region)
+
 Resources:
   # CodeDeploy
   DeploymentApp:
@@ -10,46 +21,112 @@ Resources:
     Properties:
       DeploymentGroupName: fotd-dg
       ApplicationName: !Ref DeploymentApp
-      Ec2TagFilters:
-        - Key: Name
-          Value: fotd-deploy
-          Type: KEY_AND_VALUE
+      AutoScalingGroups:
+        - !Ref AutoScalingGroup
       ServiceRoleArn: !GetAtt CodeDeployRole.Arn
-  # EC2
-  Server:
-    Type: AWS::EC2::Instance
+  # Application Load Balancer
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      ImageId: !FindInMap [ RegionMap, !Ref AWS::Region, AMI ]
-      InstanceType: t2.micro
-      KeyName: !GetAtt NetworkStack.Outputs.KeyPair
-      IamInstanceProfile: !Ref InstanceProfile
-      NetworkInterfaces:
-        - SubnetId: !GetAtt NetworkStack.Outputs.SubnetA
-          AssociatePublicIpAddress: true
-          DeviceIndex: 0
-          GroupSet: 
-            - !GetAtt NetworkStack.Outputs.SecurityGroup
-      UserData:
-        Fn::Base64: !Sub | 
-          #!/bin/sh
-          sudo su << EOF
-          yum update -y
-          yum install httpd -y
-          yum install httpd-devel -y
-          yum install python3-pip -y
-          yum install python3-devel -y
-          # Enable wsgi module
-          pip install mod_wsgi
-          mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
-          # Install CodeDeploy agent
-          yum install ruby -y
-          wget https://aws-codedeploy-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/latest/install
-          chmod +x ./install
-          ./install auto
-          service codedeploy-agent start
-          EOF
-      Tags: 
-        - { Key: Name, Value: fotd-deploy }
+      Name: fotd-alb
+      SecurityGroups:
+        - !GetAtt NetworkStack.Outputs.SecurityGroup
+      Subnets:
+        - !GetAtt NetworkStack.Outputs.SubnetA
+        - !GetAtt NetworkStack.Outputs.SubnetB
+        - !GetAtt NetworkStack.Outputs.SubnetC
+      Type: application
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ALB
+      Certificates:
+        - CertificateArn: !Ref CertificateArnMain
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Port: 443
+      Protocol: HTTPS
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: fotd-tg
+      Port: 80
+      Protocol: HTTP
+      VpcId: !GetAtt NetworkStack.Outputs.VPC
+  # Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: 1
+      MaxSize: 4
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      VPCZoneIdentifier:
+        - !GetAtt NetworkStack.Outputs.SubnetA
+        - !GetAtt NetworkStack.Outputs.SubnetB
+        - !GetAtt NetworkStack.Outputs.SubnetC
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateName: fotd-lt
+      LaunchTemplateData:
+        ImageId: !FindInMap [ RegionMap, !Ref AWS::Region, AMI ]
+        InstanceType: t2.micro
+        KeyName: !GetAtt NetworkStack.Outputs.KeyPair
+        IamInstanceProfile:
+          Name: !Ref InstanceProfile
+        SecurityGroupIds: 
+          - !GetAtt NetworkStack.Outputs.SecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/sh
+            sudo su << EOF
+            # Install yum packages
+            yum update -y
+            yum install httpd -y
+            yum install httpd-devel -y
+            yum install python3-pip -y
+            yum install python3-devel -y
+
+            # Enable wsgi module on Apache
+            pip install mod_wsgi
+            mod_wsgi-express install-module | head -n 1 > "/etc/httpd/conf.modules.d/02-wsgi.conf"
+            
+            # Install CodeDeploy agent
+            yum install ruby -y
+            wget https://aws-codedeploy-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/latest/install
+            chmod +x ./install
+            ./install auto
+            service codedeploy-agent start
+
+            # Install application
+            mkdir -p /var/www/flask/server
+            aws s3 cp s3://${AssetBucketName}/server /var/www/flask/server --recursive
+            cd /var/www/flask/server
+            mv fotd.conf /etc/httpd/conf.d/fotd.conf
+            chown apache:apache logs/fotd.log
+            python3 -m venv venv
+            source ./venv/bin/activate
+            pip install -r requirements.txt
+            
+            # Start Apache server
+            service httpd start
+            chkconfig httpd on
+            EOF
   # Roles
   GitHubProvider:
     Type: AWS::IAM::OIDCProvider
@@ -113,6 +190,15 @@ Resources:
       Roles:
         - !Ref InstanceRole
   # Misc.
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub "${DomainName}."
+      Name: !Sub "www.${DomainName}"
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt ALB.CanonicalHostedZoneID
+        DNSName: !GetAtt ALB.DNSName
   NetworkStack:
     Type: AWS::CloudFormation::Stack
     Properties:
