@@ -3,3 +3,4 @@ venv
 variables.ps1
 *.pem
 .env
+.pytest_cache

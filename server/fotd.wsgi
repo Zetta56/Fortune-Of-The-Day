@@ -10,4 +10,5 @@ logging.basicConfig(
 sys.path.insert(0, "/var/www/flask")
 sys.path.insert(0, "/var/www/flask/server/venv/lib/python3.9/site-packages")
 
-from server import app as application
+from server import create_app
+application = create_app()
