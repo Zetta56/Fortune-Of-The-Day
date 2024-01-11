@@ -1,4 +1,6 @@
 # Fortune of the Day
+![Sample Image](./docs/images/sample.JPG)
+
 This is a Fortune of the Day website created with Flask and designed for deployment on AWS.
 
 ## Prerequisites
